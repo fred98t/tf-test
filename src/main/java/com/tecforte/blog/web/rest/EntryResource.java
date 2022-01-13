@@ -1,12 +1,18 @@
 package com.tecforte.blog.web.rest;
 
+import com.tecforte.blog.domain.Blog;
+import com.tecforte.blog.service.BlogService;
 import com.tecforte.blog.service.EntryService;
 import com.tecforte.blog.web.rest.errors.BadRequestAlertException;
+import com.tecforte.blog.service.dto.BlogDTO;
 import com.tecforte.blog.service.dto.EntryDTO;
 
 import io.github.jhipster.web.util.HeaderUtil;
 import io.github.jhipster.web.util.PaginationUtil;
 import io.github.jhipster.web.util.ResponseUtil;
+
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +30,7 @@ import java.net.URISyntaxException;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * REST controller for managing {@link com.tecforte.blog.domain.Entry}.
@@ -38,11 +45,18 @@ public class EntryResource {
 
     @Value("${jhipster.clientApp.name}")
     private String applicationName;
+    
+    private final BlogService blogService;
 
     private final EntryService entryService;
+    
+    private String negative[] = {".*\\bsad\\b.*", ".*\\bfear\\b.*",".*\\blonely\\b.*"};
+    private String positive[] = {".*\\blove\\b.*", ".*\\bhappy\\b.*", ".*\\btrust\\b.*"};
+    
 
-    public EntryResource(EntryService entryService) {
-        this.entryService = entryService;
+    public EntryResource(EntryService entryService, BlogService blogService) {
+        this.blogService = blogService;
+		this.entryService = entryService;
     }
 
     /**
@@ -54,9 +68,28 @@ public class EntryResource {
      */
     @PostMapping("/entries")
     public ResponseEntity<EntryDTO> createEntry(@Valid @RequestBody EntryDTO entryDTO) throws URISyntaxException {
+        
         log.debug("REST request to save Entry : {}", entryDTO);
         if (entryDTO.getId() != null) {
             throw new BadRequestAlertException("A new entry cannot already have an ID", ENTITY_NAME, "idexists");
+        }
+        
+        Optional<BlogDTO> user=blogService.findOne(entryDTO.getBlogId());
+        if(user != null) {
+        if(user.get().isPositive()) {
+        	for(String neg:negative) {
+        		if((entryDTO.getContent().toLowerCase().matches(neg)) || (entryDTO.getTitle().toLowerCase().matches(neg))) {
+        			throw new BadRequestAlertException("Invalid Content", ENTITY_NAME, "invalidContent");
+        		}
+        	}
+        }
+        else {
+        	for(String pos:positive) {
+        		if(entryDTO.getContent().toLowerCase().matches(pos) || entryDTO.getTitle().toLowerCase().matches(pos)) {
+        			throw new BadRequestAlertException("Invalid Content", ENTITY_NAME, "invalidContent");
+        		}
+        	}
+        }
         }
         EntryDTO result = entryService.save(entryDTO);
         return ResponseEntity.created(new URI("/api/entries/" + result.getId()))
