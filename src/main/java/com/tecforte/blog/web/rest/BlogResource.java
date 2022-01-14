@@ -1,14 +1,19 @@
 package com.tecforte.blog.web.rest;
 
+import com.tecforte.blog.domain.Blog;
 import com.tecforte.blog.service.BlogService;
+import com.tecforte.blog.service.EntryService;
 import com.tecforte.blog.web.rest.errors.BadRequestAlertException;
 import com.tecforte.blog.service.dto.BlogDTO;
+import com.tecforte.blog.service.dto.EntryDTO;
 
 import io.github.jhipster.web.util.HeaderUtil;
 import io.github.jhipster.web.util.ResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,9 +39,14 @@ public class BlogResource {
     private String applicationName;
 
     private final BlogService blogService;
+    
+    private final EntryService entryService;
+    
+    private String clean[] = {".*\\blost\\b.*", ".*\\bruin\\b.*"};
 
-    public BlogResource(BlogService blogService) {
+    public BlogResource(BlogService blogService, EntryService entryService) {
         this.blogService = blogService;
+		this.entryService = entryService;
     }
 
     /**
@@ -114,6 +124,23 @@ public class BlogResource {
     public ResponseEntity<Void> deleteBlog(@PathVariable Long id) {
         log.debug("REST request to delete Blog : {}", id);
         blogService.delete(id);
+        return ResponseEntity.noContent().headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString())).build();
+    }
+    @DeleteMapping("/blogs/{id}/clean")
+    public ResponseEntity<Void> cleanBlog(@PathVariable Long id,Pageable pageable) {
+        log.debug("REST request to clean entry of Blog : {}", id);
+        Page<EntryDTO> page = entryService.findAll(pageable);
+        for(int i=0;i<page.getContent().size();i++) {
+        	if(page.getContent().get(i).getBlogId()==id) {
+        		for(String cl:clean) {
+        		if((page.getContent().get(i).getContent().toLowerCase().matches(cl)) || (page.getContent().get(i).getTitle().toLowerCase().matches(cl))) {
+        			entryService.delete(page.getContent().get(i).getId());
+        		}
+        		}
+        	}
+        	
+        	
+        }
         return ResponseEntity.noContent().headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString())).build();
     }
 }
